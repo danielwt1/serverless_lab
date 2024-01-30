@@ -1,0 +1,107 @@
+service: poclambda
+frameworkVersion: "3"
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: us-west-2
+  environment:
+    REGION: ${self:provider.region}
+    SQSNAMEASSIGNTECHNICALQUEUE: "AssignToTicketTechnicalQueue"
+    TICKETINFOTABLE: "ticket_info"
+  
+functions:
+  ticketsRegister:
+    handler: handler.ticketsRegister
+    package: 
+      individually: true
+  createTableTechnical:
+    handler: handler.createtableTechnical
+    package: 
+      individually: true
+    events:
+      - eventBridge:
+          pattern: 
+            source:
+              - aws.rds
+            detail-type:
+              - RDS DB INSTANCE
+            detail:
+              state: 
+                - running
+              
+
+resources:
+  Resources:
+    TicketInfoDynamoTable:
+      Type: "AWS::DynamoDB::Table"
+      Properties:
+        AttributeDefinitions:
+          - 
+            AttributeName: "userId"
+            AttributeType: "S"
+          - 
+            AttributeName: "ticketId"
+            AttributeType: "S"
+          - 
+            AttributeName: "status"
+            AttributeType: "S"
+
+        KeySchema:
+          -
+            AttributeName: "userId"
+            KeyType: "HASH"
+          -
+            AttributeName: "ticketId"
+            KeyType: "RANGE"        
+        TableName: "${self:provider.environment.TICKETINFOTABLE}"
+        StreamSpecification:
+          StreamViewType: NEW_AND_OLD_IMAGES
+        LocalSecondaryIndexes:          
+          - 
+            IndexName: "UserAndSortByStatus"
+            KeySchema:
+              - 
+                AttributeName: "userId"
+                KeyType: "HASH"
+              -
+                AttributeName: "status"
+                KeyType: "RANGE"
+            Projection:
+              ProjectionType: "ALL"
+        BillingMode: "PAY_PER_REQUEST"
+    AssignToTicketTechnicalQueue:
+      Type: "AWS::SQS::Queue"
+      Properties:
+        QueueName: ${self:provider.environment.SQSNAMEASSIGNTECHNICALQUEUE}
+    BucketEvidencyTicket:
+      Type: "AWS::S3::Bucket"
+      Properties:
+        BucketName: "evidencyimagesticket"
+    TechnicalRdsInstance:
+      Type: "AWS::RDS::DBInstance"
+      Properties:
+        DBInstanceIdentifier: mysqldbtaller
+        DBName: technical
+        DBInstanceClass: db.t2.micro
+        AllocatedStorage: '5'
+        Engine: MySQL
+        MasterUsername: admin
+        MasterUserPassword: postgres
+        VPCSecurityGroups: 
+          - sg-0c22f1a9a49792467
+        DBSubnetGroupName: !Ref MysqlInstanceDBGroups
+    MysqlInstanceDBGroups:
+      Type: AWS::RDS::DBSubnetGroup
+      Properties:
+        DBSubnetGroupDescription: Grupo para instancia RDS de mysql
+        SubnetIds:
+          - subnet-001c14f2875def875
+          - subnet-0c6547e0a5b21eb8b
+    
+    
+        
+
+
+          
+
+
